@@ -1,0 +1,36 @@
+name: sync-upstream
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: brainbow
+          fetch-depth: 0
+      - name: Fast-forward main and tags from upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git remote add upstream https://github.com/denoland/deno.git
+          git fetch --prune --tags upstream main
+          git push origin refs/remotes/upstream/main:refs/heads/main
+          git push origin --tags
+      - name: Merge main into brainbow
+        run: |
+          git config user.name "brainbow-sync"
+          git config user.email "sync@brainbow.invalid"
+          git merge --no-edit origin/main || { git merge --abort; echo "::error::brainbow has conflicts with upstream main"; exit 1; }
+          git push origin brainbow
